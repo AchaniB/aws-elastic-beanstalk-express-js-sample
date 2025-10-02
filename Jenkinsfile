@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:16'
+        }
+    }
 
     environment {
         DOCKER_IMAGE = 'achani99/nodejs-cicd-app'
