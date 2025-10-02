@@ -18,6 +18,12 @@ pipeline {
       }
     }
 
+    stage('Checkout Code') {
+      steps {
+        echo "✅ Code checked out"
+      }
+    }
+
     stage('Install Dependencies') {
       steps {
         script {
@@ -76,7 +82,7 @@ pipeline {
 
     stage('Post Actions') {
       steps {
-        echo '📦 Archiving debug logs...'
+        echo '📦 Archiving npm logs (if any)...'
         archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
       }
     }
@@ -84,10 +90,10 @@ pipeline {
 
   post {
     success {
-      echo "✅ Successfully built and pushed $IMAGE_NAME:$IMAGE_TAG"
+      echo "✅ Build and deployment successful!"
     }
     failure {
-      echo "❌ Build failed"
+      echo "❌ Build failed. Check logs above."
     }
   }
 }
