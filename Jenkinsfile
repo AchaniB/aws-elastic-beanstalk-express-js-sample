@@ -1,11 +1,9 @@
-pipeline {
-    agent {
-        docker {
-            image 'node:18-slim'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
+agent {
+    docker {
+        image 'achani99/node-docker:18'
+        args '-v /var/run/docker.sock:/var/run/docker.sock'
     }
-
+}
     environment {
         DOCKER_IMAGE = 'achani99/nodejs-cicd-app'
         DOCKER_TAG = 'latest'
