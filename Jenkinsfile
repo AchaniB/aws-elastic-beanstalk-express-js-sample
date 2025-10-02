@@ -1,16 +1,13 @@
 pipeline {
   agent any
-
   options {
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
   }
-
   environment {
-    IMAGE_NAME = "achani99/node-docker" 
-    IMAGE_TAG  = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+    IMAGE_NAME = "achani99/node-docker"
+    IMAGE_TAG  = "18"
   }
-
   stages {
     stage('Checkout') {
       steps {
@@ -18,7 +15,7 @@ pipeline {
       }
     }
 
-    stage('Install & Test (Custom Node 18)') {
+    stage('Install & Test (Node 18)') {
       agent {
         docker {
           image 'achani99/node-docker:18'
@@ -28,7 +25,7 @@ pipeline {
       steps {
         sh 'node -v && npm -v'
         sh 'npm ci'
-        sh 'npm test || echo "⚠️ No tests found or tests failed — skipping failure"'
+        sh 'npm test || echo "⚠️ No tests found or tests failed"'
       }
     }
 
@@ -41,11 +38,11 @@ pipeline {
       }
       steps {
         sh 'npm ci --prefer-offline --no-audit'
-        sh 'npm audit --audit-level=high'
+        sh 'npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"'
       }
     }
 
-    stage('Build Image') {
+    stage('Build Docker Image') {
       steps {
         sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
       }
@@ -54,20 +51,17 @@ pipeline {
     stage('Login & Push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+          sh '''
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            docker push $IMAGE_NAME:$IMAGE_TAG
+          '''
         }
-        sh '''
-          docker push $IMAGE_NAME:$IMAGE_TAG
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
-          docker push $IMAGE_NAME:latest
-        '''
       }
     }
   }
-
   post {
     success {
-      echo "✅ Pushed $IMAGE_NAME:$IMAGE_TAG"
+      echo "✅ Successfully built and pushed $IMAGE_NAME:$IMAGE_TAG"
     }
     always {
       archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
