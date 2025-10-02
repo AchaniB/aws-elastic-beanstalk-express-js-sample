@@ -1,18 +1,20 @@
-agent {
-    docker {
-        image 'achani99/node-docker:18'
-        args '-v /var/run/docker.sock:/var/run/docker.sock'
+pipeline {
+    agent {
+        docker {
+            image 'achani99/node-docker:18' // <-- Your custom image
+            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
-}
+
     environment {
-        DOCKER_IMAGE = 'achani99/nodejs-cicd-app'
-        DOCKER_TAG = 'latest'
+        npm_config_cache = "${env.WORKSPACE}/.npm-cache"
+        IMAGE_NAME = 'achani99/nodejs-cicd-app'
     }
 
     stages {
-        stage('Install Docker CLI') {
+        stage('Checkout Code') {
             steps {
-                sh 'apt-get update && apt-get install -y docker.io'
+                checkout scm
             }
         }
 
@@ -22,35 +24,15 @@ agent {
             }
         }
 
-        stage('Run Unit Tests') {
+        stage('Run Tests') {
             steps {
                 script {
                     try {
                         sh 'npm test'
                     } catch (err) {
-                        echo "⚠️ No test script found or failed — skipping tests"
+                        echo "⚠️ Tests failed or missing"
                     }
                 }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t $DOCKER_IMAGE:$DOCKER_TAG .'
-            }
-        }
-
-        stage('Login to Docker Hub') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                sh 'docker push $DOCKER_IMAGE:$DOCKER_TAG'
             }
         }
 
@@ -60,7 +42,21 @@ agent {
                     sh '''
                         npm install -g snyk
                         snyk auth $SNYK_TOKEN
-                        snyk test --severity-threshold=high || echo "⚠️ Snyk found issues"
+                        snyk test --severity-threshold=high || echo "⚠️ Snyk issues found"
+                    '''
+                }
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        docker build -t $IMAGE_NAME:$BUILD_NUMBER .
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push $IMAGE_NAME:$BUILD_NUMBER
+                        docker tag $IMAGE_NAME:$BUILD_NUMBER $IMAGE_NAME:latest
+                        docker push $IMAGE_NAME:latest
                     '''
                 }
             }
@@ -69,12 +65,16 @@ agent {
 
     post {
         success {
-            echo '✅ CI/CD pipeline completed successfully!'
-            cleanWs()
+            node {
+                echo '✅ Pipeline completed successfully!'
+                cleanWs()
+            }
         }
         failure {
-            echo '🚨 Pipeline failed. Please check the error logs.'
-            cleanWs()
+            node {
+                echo '🚨 Pipeline failed. Please check the logs.'
+                cleanWs()
+            }
         }
     }
 }
