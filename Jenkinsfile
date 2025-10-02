@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'achani99/node-docker:18' // <-- Your custom image
+            image 'achani99/node-docker:18'
             args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
@@ -30,7 +30,7 @@ pipeline {
                     try {
                         sh 'npm test'
                     } catch (err) {
-                        echo "⚠️ Tests failed or missing"
+                        echo "⚠️ Tests failed or not found — continuing"
                     }
                 }
             }
@@ -42,7 +42,7 @@ pipeline {
                     sh '''
                         npm install -g snyk
                         snyk auth $SNYK_TOKEN
-                        snyk test --severity-threshold=high || echo "⚠️ Snyk issues found"
+                        snyk test --severity-threshold=high || echo "⚠️ Snyk found issues"
                     '''
                 }
             }
@@ -63,13 +63,14 @@ pipeline {
         }
     }
 
-post {
-    success {
-        echo '✅ Pipeline completed successfully!'
-        cleanWs()
-    }
-    failure {
-        echo '🚨 Pipeline failed. Please check the logs.'
-        cleanWs()
+    post {
+        success {
+            echo '✅ Pipeline completed successfully!'
+            cleanWs()
+        }
+        failure {
+            echo '❌ Pipeline failed. Check logs above.'
+            cleanWs()
+        }
     }
 }
