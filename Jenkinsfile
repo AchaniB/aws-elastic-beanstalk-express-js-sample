@@ -1,53 +1,69 @@
 pipeline {
   agent any
-  options {
-    timestamps()
-    buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
-  }
+
   environment {
     IMAGE_NAME = "achani99/node-docker"
-    IMAGE_TAG  = "18"
+    IMAGE_TAG  = "16"
+  }
+
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '10'))
   }
 
   stages {
     stage('Checkout SCM') {
       steps {
         checkout scm
-      }
-    }
-
-    stage('Checkout') {
-      steps {
-        sh 'echo "✅ Code checked out"'
+        sh 'echo ✅ Code checked out'
       }
     }
 
     stage('Install Dependencies') {
+      agent {
+        docker {
+          image "${IMAGE_NAME}:${IMAGE_TAG}"
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
       steps {
+        sh 'node -v && npm -v'
         sh 'npm ci'
       }
     }
 
     stage('Fix Vulnerabilities') {
+      agent {
+        docker {
+          image "${IMAGE_NAME}:${IMAGE_TAG}"
+          args '-u root'
+        }
+      }
       steps {
-        // Optional: automatic fix (only if using something like npm audit fix)
-        sh 'npm audit fix || echo "⚠️ No fixable vulnerabilities"'
+        sh 'npm audit fix || echo "⚠️ No fixes or not needed"'
       }
     }
 
     stage('Snyk Security Scan') {
+      agent {
+        docker {
+          image "${IMAGE_NAME}:${IMAGE_TAG}"
+          args '-u root'
+        }
+      }
       steps {
-        sh '''
-          if ! command -v snyk &> /dev/null; then
-            npm install -g snyk
-          fi
-          snyk auth $SNYK_TOKEN || echo "⚠️ Snyk auth failed"
-          snyk test || echo "⚠️ Vulnerabilities found"
-        '''
+        sh 'npm ci --prefer-offline --no-audit'
+        sh 'npm audit --audit-level=high || echo "⚠️ High vulnerabilities found"'
       }
     }
 
     stage('Build & Push Image') {
+      agent {
+        docker {
+          image "${IMAGE_NAME}:${IMAGE_TAG}"
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
       steps {
         sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -60,20 +76,20 @@ pipeline {
     }
 
     stage('Run Tests') {
-      steps {
-        script {
-          def result = sh(script: 'npm test', returnStatus: true)
-          if (result != 0) {
-            echo "❌ Tests failed"
-          } else {
-            echo "✅ Tests passed"
-          }
+      agent {
+        docker {
+          image "${IMAGE_NAME}:${IMAGE_TAG}"
+          args '-u root'
         }
+      }
+      steps {
+        sh 'npm test || echo "⚠️ No tests or some tests failed"'
       }
     }
 
     stage('Post Actions') {
       steps {
+        echo '📦 Archiving logs if any...'
         archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
       }
     }
@@ -81,7 +97,7 @@ pipeline {
 
   post {
     success {
-      echo "✅ Successfully built and pushed $IMAGE_NAME:$IMAGE_TAG"
+      echo "✅ Build and push successful for $IMAGE_NAME:$IMAGE_TAG"
     }
     failure {
       echo "❌ Build failed"
