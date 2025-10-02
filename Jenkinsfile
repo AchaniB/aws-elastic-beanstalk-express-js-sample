@@ -18,12 +18,11 @@ pipeline {
       }
     }
 
-    stage('Install & Test (Node 18)') {
+    stage('Install & Test (Custom Node 18)') {
       agent {
         docker {
-          // use your custom image that already has Docker installed
           image 'achani99/node-docker:18'
-          args '-u root -v $HOME/.npm:/root/.npm -v /var/run/docker.sock:/var/run/docker.sock'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
         }
       }
       steps {
@@ -36,7 +35,6 @@ pipeline {
     stage('Dependency Scan (fail on HIGH)') {
       agent {
         docker {
-          // use same image for consistency
           image 'achani99/node-docker:18'
           args '-u root'
         }
