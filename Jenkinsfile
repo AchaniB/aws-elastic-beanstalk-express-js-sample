@@ -1,12 +1,23 @@
 pipeline {
     agent {
         docker {
-            image 'node:18-slim'    // You can change to node:20-slim if needed
+            image 'node:18-slim'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
 
+    environment {
+        DOCKER_IMAGE = 'achani99/nodejs-cicd-app'
+        DOCKER_TAG = 'latest'
+    }
+
     stages {
+        stage('Install Docker CLI') {
+            steps {
+                sh 'apt-get update && apt-get install -y docker.io'
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 sh 'npm install'
@@ -61,9 +72,11 @@ pipeline {
     post {
         success {
             echo '✅ CI/CD pipeline completed successfully!'
+            cleanWs()
         }
         failure {
             echo '🚨 Pipeline failed. Please check the error logs.'
+            cleanWs()
         }
     }
 }
