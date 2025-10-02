@@ -1,76 +1,61 @@
 pipeline {
-    agent {
+  agent any
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
+  }
+  environment {
+    IMAGE_NAME = "achani99/node-docker" 
+    IMAGE_TAG  = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+  }
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Install & Test (Node 16)') {
+      agent {
         docker {
-            image 'achani99/node-docker:18'
-            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+          image 'node:16-alpine'
+          args '-v $HOME/.npm:/root/.npm'
         }
+      }
+      steps {
+        sh 'node -v && npm -v'
+        sh 'npm ci'
+        sh 'npm test || echo "no tests"'
+      }
     }
 
-    environment {
-        npm_config_cache = "${env.WORKSPACE}/.npm-cache"
-        IMAGE_NAME = 'achani99/nodejs-cicd-app'
+    stage('Dependency Scan (fail on HIGH)') {
+      agent {
+        docker {
+          image 'node:16-alpine'
+        }
+      }
+      steps {
+        sh 'npm ci --prefer-offline --no-audit'
+        sh 'npm audit --audit-level=high'
+      }
     }
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm install'
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                script {
-                    try {
-                        sh 'npm test'
-                    } catch (err) {
-                        echo "⚠️ Tests failed or not found — continuing"
-                    }
-                }
-            }
-        }
-
-        stage('Snyk Security Scan') {
-            steps {
-                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
-                    sh '''
-                        npm install -g snyk
-                        snyk auth $SNYK_TOKEN
-                        snyk test --severity-threshold=high || echo "⚠️ Snyk found issues"
-                    '''
-                }
-            }
-        }
-
-        stage('Build & Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        docker build -t $IMAGE_NAME:$BUILD_NUMBER .
-                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker push $IMAGE_NAME:$BUILD_NUMBER
-                        docker tag $IMAGE_NAME:$BUILD_NUMBER $IMAGE_NAME:latest
-                        docker push $IMAGE_NAME:latest
-                    '''
-                }
-            }
-        }
+    stage('Build Image') {
+      steps {
+        sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+      }
     }
 
-    post {
-        success {
-            echo '✅ Pipeline completed successfully!'
-            cleanWs()
+    stage('Login & Push') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
         }
-        failure {
-            echo '❌ Pipeline failed. Check logs above.'
-            cleanWs()
-        }
+        sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+      }
     }
+  }
+  post {
+    success { echo "Pushed $IMAGE_NAME:$IMAGE_TAG" }
+    always  { archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true }
+  }
 }
