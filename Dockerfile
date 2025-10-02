@@ -1,16 +1,10 @@
-# Use official Node.js 18 image (slim version)
 FROM node:18-slim
 
-# Set working directory
-WORKDIR /app
+# Install Docker CLI
+RUN apt-get update && \
+    apt-get install -y docker.io && \
+    apt-get clean
 
-# Copy files and install dependencies
-COPY package*.json ./
-RUN npm install
+# Optional: verify
+RUN docker --version
 
-# Copy rest of the app
-COPY . .
-
-# Expose app port and run
-EXPOSE 3000
-CMD ["npm", "start"]
