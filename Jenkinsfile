@@ -16,7 +16,7 @@ pipeline {
       }
     }
 
-    stage('Checkout Code') {
+    stage('Checkout') {
       steps {
         sh 'echo "✅ Code checked out"'
       }
