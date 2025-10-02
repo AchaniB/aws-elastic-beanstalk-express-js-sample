@@ -13,10 +13,10 @@ pipeline {
       steps { checkout scm }
     }
 
-    stage('Install & Test (Node 16)') {
+    stage('Install & Test (Node 18)') {
       agent {
         docker {
-          image 'node:16-alpine'
+          image 'node:18-alpine'
           args '-v $HOME/.npm:/root/.npm'
         }
       }
