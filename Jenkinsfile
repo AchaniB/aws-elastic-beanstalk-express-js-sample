@@ -12,25 +12,34 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
+    stage('Checkout SCM') {
       steps {
         checkout scm
       }
     }
 
-    stage('Install & Test (Node 18)') {
+    stage('Install Dependencies') {
       steps {
         script {
           docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
             sh 'node -v && npm -v'
             sh 'npm ci'
-            sh 'npm test || echo "⚠️ No tests found or tests failed"'
           }
         }
       }
     }
 
-    stage('Dependency Scan (fail on HIGH)') {
+    stage('Fix Vulnerabilities') {
+      steps {
+        script {
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
+            sh 'npm audit fix || echo "⚠️ Nothing to fix"'
+          }
+        }
+      }
+    }
+
+    stage('Snyk Security Scan') {
       steps {
         script {
           docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
@@ -41,20 +50,34 @@ pipeline {
       }
     }
 
-    stage('Build Docker Image') {
+    stage('Build & Push Image') {
       steps {
-        sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+        script {
+          sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+          withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+            sh '''
+              echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+              docker push $IMAGE_NAME:$IMAGE_TAG
+            '''
+          }
+        }
       }
     }
 
-    stage('Login & Push') {
+    stage('Run Tests') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-            docker push $IMAGE_NAME:$IMAGE_TAG
-          '''
+        script {
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
+            sh 'npm test || echo "⚠️ No tests or some tests failed"'
+          }
         }
+      }
+    }
+
+    stage('Post Actions') {
+      steps {
+        echo '📦 Archiving debug logs...'
+        archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
       }
     }
   }
@@ -63,8 +86,8 @@ pipeline {
     success {
       echo "✅ Successfully built and pushed $IMAGE_NAME:$IMAGE_TAG"
     }
-    always {
-      archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
+    failure {
+      echo "❌ Build failed"
     }
   }
 }
