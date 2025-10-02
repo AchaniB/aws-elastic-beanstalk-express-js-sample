@@ -79,13 +79,6 @@ pipeline {
         }
       }
     }
-
-    stage('Post Actions') {
-      steps {
-        echo '📦 Archiving npm logs (if any)...'
-        archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
-      }
-    }
   }
 
   post {
@@ -94,6 +87,10 @@ pipeline {
     }
     failure {
       echo "❌ Build failed. Check logs above."
+    }
+    always {
+      echo '📦 Archiving npm logs (if any)...'
+      archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
     }
   }
 }
