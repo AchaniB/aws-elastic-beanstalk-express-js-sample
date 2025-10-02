@@ -1,9 +1,9 @@
 pipeline {
-    agent any
-
-    environment {
-        DOCKER_IMAGE = 'achani99/nodejs-cicd-app'
-        DOCKER_TAG = 'latest'
+    agent {
+        docker {
+            image 'node:18-slim'    // You can change to node:20-slim if needed
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
 
     stages {
