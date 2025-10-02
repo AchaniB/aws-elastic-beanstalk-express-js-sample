@@ -63,19 +63,13 @@ pipeline {
         }
     }
 
-    post {
-        success {
-            node {
-                echo '✅ Pipeline completed successfully!'
-                cleanWs()
-            }
-        }
-        failure {
-            node {
-                echo '🚨 Pipeline failed. Please check the logs.'
-                cleanWs()
-            }
-        }
+post {
+    success {
+        echo '✅ Pipeline completed successfully!'
+        cleanWs()
+    }
+    failure {
+        echo '🚨 Pipeline failed. Please check the logs.'
+        cleanWs()
     }
 }
-
