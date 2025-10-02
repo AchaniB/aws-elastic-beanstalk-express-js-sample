@@ -8,7 +8,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = "achani99/node-docker"
-    IMAGE_TAG  = "16"
+    IMAGE_TAG  = "18"
   }
 
   stages {
@@ -20,7 +20,8 @@ pipeline {
 
     stage('Checkout Code') {
       steps {
-        echo "✅ Code checked out"
+        echo "✅ Code checked out from repository"
+        sh 'ls -la'  // optional: show code files in workspace
       }
     }
 
@@ -94,4 +95,3 @@ pipeline {
     }
   }
 }
-
