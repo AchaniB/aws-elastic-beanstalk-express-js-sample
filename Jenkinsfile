@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   options {
-    skipDefaultCheckout(true)  // disable Jenkins' implicit checkout
+    skipDefaultCheckout(true)
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
   }
@@ -16,11 +16,6 @@ pipeline {
     stage('Checkout SCM') {
       steps {
         checkout scm
-      }
-    }
-
-    stage('Checkout Code') {
-      steps {
         echo "✅ Code is now available in workspace: ${env.WORKSPACE}"
         sh 'ls -la'
       }
