@@ -2,7 +2,6 @@ pipeline {
   agent any
 
   options {
-    skipDefaultCheckout(true)
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
   }
@@ -16,8 +15,15 @@ pipeline {
     stage('Checkout SCM') {
       steps {
         checkout scm
-        echo "✅ Code is now available in workspace: ${env.WORKSPACE}"
-        sh 'ls -la'
+      }
+    }
+
+    stage('Checkout Code') {
+      steps {
+        script {
+          sh 'echo "✅ Code is now available in workspace: $PWD"'
+          sh 'ls -la' // Optionally list files to show contents
+        }
       }
     }
 
@@ -53,7 +59,7 @@ pipeline {
       }
     }
 
-    stage('Build & Push Docker Image') {
+    stage('Build & Push Image') {
       steps {
         script {
           sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
