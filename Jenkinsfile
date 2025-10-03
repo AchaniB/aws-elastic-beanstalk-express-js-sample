@@ -18,12 +18,10 @@ pipeline {
       }
     }
 
-    stage('Checkout Code') {
+    stage('Show Workspace') {
       steps {
-        script {
-          sh 'echo "Code is now available in workspace: $PWD"'
-          sh 'ls -la' // Optionally list files to show contents
-        }
+        echo "✅ Code is now available in workspace: ${env.WORKSPACE}"
+        sh 'ls -la'
       }
     }
 
@@ -42,7 +40,7 @@ pipeline {
       steps {
         script {
           docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
-            sh 'npm audit fix || echo "Nothing to fix"'
+            sh 'npm audit fix || echo "⚠️ Nothing to fix"'
           }
         }
       }
@@ -53,13 +51,13 @@ pipeline {
         script {
           docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
             sh 'npm ci --prefer-offline --no-audit'
-            sh 'npm audit --audit-level=high || echo "Vulnerabilities found"'
+            sh 'npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"'
           }
         }
       }
     }
 
-    stage('Build & Push Image') {
+    stage('Build & Push Docker Image') {
       steps {
         script {
           sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
@@ -77,7 +75,7 @@ pipeline {
       steps {
         script {
           docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
-            sh 'npm test || echo "No tests or some tests failed"'
+            sh 'npm test || echo "⚠️ No tests or some tests failed"'
           }
         }
       }
@@ -86,13 +84,13 @@ pipeline {
 
   post {
     success {
-      echo " Build and deployment successful!"
+      echo "✅ Build and deployment successful!"
     }
     failure {
-      echo " Build failed. Check logs above."
+      echo "❌ Build failed. Check logs above."
     }
     always {
-      echo 'Archiving npm logs (if any)...'
+      echo '📦 Archiving npm logs (if any)...'
       archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
     }
   }
