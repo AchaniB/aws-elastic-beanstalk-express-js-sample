@@ -15,22 +15,30 @@ pipeline {
         }
         
         stage('Install Dependencies') {
-            agent {
-                docker {
-                    image 'node:16-alpine'
-                    args '-u root'
-                    reuseNode true
-                }
-            }
-            steps {
-                script {
-                    echo '🔧 Installing dependencies...'
-                    sh 'node -v'
-                    sh 'npm -v'
-                    sh 'npm ci --only=production'
-                }
-            }
+    agent {
+        docker {
+            image 'achani99/node-docker:16-alpine'
+            args '-u root'
+            reuseNode true
         }
+    }
+    steps {
+        script {
+            echo '🔧 Installing dependencies...'
+            sh '''
+              node -v
+              npm -v
+              apt-get update && apt-get install -y make g++ python3
+              if [ -f package-lock.json ]; then
+                npm ci --only=production
+              else
+                npm install --only=production
+              fi
+            '''
+        }
+    }
+}
+
         
         stage('Fix Vulnerabilities') {
             steps {
