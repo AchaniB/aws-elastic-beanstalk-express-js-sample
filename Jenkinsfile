@@ -9,7 +9,7 @@ pipeline {
   environment {
     IMAGE_NAME = "achani99/node-docker"
     GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-    IMAGE_TAG = "16-alpine"
+    IMAGE_TAG = "${GIT_COMMIT_SHORT}"
   }
 
   stages {
