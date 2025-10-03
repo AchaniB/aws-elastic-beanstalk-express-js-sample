@@ -23,13 +23,11 @@ pipeline {
                 }
             }
             steps {
-                echo '🔧 Installing dependencies...'
                 sh 'node -v'
                 sh 'npm -v'
                 sh 'npm ci --only=production'
             }
         }
-
         stage('Fix Vulnerabilities') {
             steps {
                 echo '🔒 Checking for vulnerabilities...'
@@ -79,3 +77,4 @@ pipeline {
         }
     }
 }
+
