@@ -3,48 +3,53 @@ pipeline {
     
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        SNYK_TOKEN = credentials('snyk-token')
+        IMAGE_NAME = "achani99/nodejs-cicd-app"
     }
     
     stages {
-        stage('Checkout Code') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
                 sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
                 sh 'ls -la'
             }
         }
         
         stage('Install Dependencies') {
-    agent {
-        docker {
-            image 'achani99/node-docker:16-alpine'
-            args '-u root'
-            reuseNode true
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    echo '🔧 Installing dependencies...'
+                    sh '''
+                      node -v
+                      npm -v
+                      if [ -f package-lock.json ]; then
+                        npm ci --only=production
+                      else
+                        npm install --only=production
+                      fi
+                    '''
+                }
+            }
         }
-    }
-    steps {
-        script {
-            echo '🔧 Installing dependencies...'
-            sh '''
-              node -v
-              npm -v
-              apt-get update && apt-get install -y make g++ python3
-              if [ -f package-lock.json ]; then
-                npm ci --only=production
-              else
-                npm install --only=production
-              fi
-            '''
-        }
-    }
-}
-
         
         stage('Fix Vulnerabilities') {
             steps {
                 script {
                     echo '🔒 Checking for vulnerabilities...'
-                    // Add your security scanning steps here
+                    sh 'npm audit --audit-level=high || true'
                 }
             }
         }
@@ -52,8 +57,12 @@ pipeline {
         stage('Snyk Security Scan') {
             steps {
                 script {
-                    echo '🔍 Running security scan...'
-                    // Add Snyk scanning steps here
+                    echo '🔍 Running Snyk security scan...'
+                    sh '''
+                      npm install -g snyk
+                      snyk auth ${SNYK_TOKEN}
+                      snyk test --severity-threshold=high || exit 1
+                    '''
                 }
             }
         }
@@ -62,7 +71,13 @@ pipeline {
             steps {
                 script {
                     echo '🐳 Building and pushing Docker image...'
-                    // Add Docker build/push steps here
+                    sh '''
+                      docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                      echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                      docker push ${IMAGE_NAME}:${BUILD_NUMBER}
+                      docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
+                      docker push ${IMAGE_NAME}:latest
+                    '''
                 }
             }
         }
@@ -70,7 +85,7 @@ pipeline {
         stage('Run Tests') {
             agent {
                 docker {
-                    image 'node:16-alpine'
+                    image 'achani99/node-docker:16-alpine'
                     args '-u root'
                     reuseNode true
                 }
@@ -78,7 +93,14 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    sh 'npm test || true'  // Continue even if tests fail
+                    // If you don’t have a test script, just skip gracefully
+                    sh '''
+                      if npm run | grep -q "test"; then
+                        npm test
+                      else
+                        echo "⚠️ No test script found in package.json, skipping tests."
+                      fi
+                    '''
                 }
             }
         }
