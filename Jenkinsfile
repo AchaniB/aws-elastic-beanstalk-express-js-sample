@@ -12,11 +12,9 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
+    stage('Checkout Code') {
       steps {
         checkout scm
-        echo "✅ Code is now available in workspace: ${env.WORKSPACE}"
-        sh 'ls -la'
       }
     }
 
