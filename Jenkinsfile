@@ -1,15 +1,26 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)  // 💡 Disable implicit SCM checkout
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
+    }
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout SCM') {
             steps {
-                echo '📁 Verifying code in workspace...'
-                sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
+                checkout scm
+            }
+        }
+
+        stage('Verify Code') {
+            steps {
+                echo '✅ Code is available in workspace'
                 sh 'ls -la'
             }
         }
@@ -28,6 +39,7 @@ pipeline {
                 sh 'npm ci --only=production'
             }
         }
+
         stage('Fix Vulnerabilities') {
             steps {
                 echo '🔒 Checking for vulnerabilities...'
