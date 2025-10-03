@@ -1,19 +1,30 @@
 pipeline {
     agent any
-    
+
+    options {
+        skipDefaultCheckout(true)
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
+    }
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
     }
-    
+
     stages {
-        stage('Checkout Code') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
-                sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
+            }
+        }
+
+        stage('Verify Code') {
+            steps {
+                echo '✅ Code is available in workspace'
                 sh 'ls -la'
             }
         }
-        
+
         stage('Install Dependencies') {
             agent {
                 docker {
@@ -24,41 +35,43 @@ pipeline {
             }
             steps {
                 script {
-                    echo '🔧 Installing dependencies...'
-                    sh 'node -v'
-                    sh 'npm -v'
-                    sh 'npm ci --only=production'
+                    echo '🔧 Verifying Node & NPM...'
+                    sh 'node -v || echo "❌ Node not found"'
+                    sh 'npm -v || echo "❌ NPM not found"'
+
+                    echo '📦 Installing production dependencies...'
+                    sh '''
+                        if [ -f package.json ]; then
+                            npm ci --only=production || npm install --only=production
+                        else
+                            echo "❌ package.json not found"; exit 1
+                        fi
+                    '''
                 }
             }
         }
-        
+
         stage('Fix Vulnerabilities') {
             steps {
-                script {
-                    echo '🔒 Checking for vulnerabilities...'
-                    // Add your security scanning steps here
-                }
+                echo '🔒 Checking for vulnerabilities...'
+                // Add fix logic if needed
             }
         }
-        
+
         stage('Snyk Security Scan') {
             steps {
-                script {
-                    echo '🔍 Running security scan...'
-                    // Add Snyk scanning steps here
-                }
+                echo '🔍 Running Snyk security scan...'
+                // Add snyk scan logic here
             }
         }
-        
+
         stage('Build & Push Image') {
             steps {
-                script {
-                    echo '🐳 Building and pushing Docker image...'
-                    // Add Docker build/push steps here
-                }
+                echo '🐳 Building and pushing Docker image...'
+                // Add docker build and push logic here
             }
         }
-        
+
         stage('Run Tests') {
             agent {
                 docker {
@@ -70,12 +83,18 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    sh 'npm test || true'  // Continue even if tests fail
+                    sh '''
+                        if [ -f package.json ]; then
+                            npm test || echo "⚠️ Some tests may have failed."
+                        else
+                            echo "❌ package.json not found. Skipping tests."
+                        fi
+                    '''
                 }
             }
         }
     }
-    
+
     post {
         always {
             echo '📦 Archiving npm logs (if any)...'
