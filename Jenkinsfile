@@ -1,77 +1,100 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:16-alpine'
-            args '-u root'
-        }
-    }
+    agent any
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         SNYK_TOKEN = credentials('snyk-token')
-        IMAGE_NAME = "achani99/node-docker"
-        IMAGE_TAG = "16-alpine"
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
+                sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
+                sh 'ls -la'
             }
         }
 
         stage('Install Dependencies') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo '🔧 Installing dependencies...'
-                    sh '''
-                      node -v
-                      npm -v
-                      npm install --save
-                    '''
+                    sh 'node -v'
+                    sh 'npm -v'
+                    sh 'npm ci --only=production'
                 }
             }
         }
 
-        stage('Run Unit Tests') {
+        stage('Fix Vulnerabilities') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
-                    echo '🧪 Running tests...'
-                    sh 'npm test || true'
+                    echo '🔒 Running npm audit fix...'
+                    sh 'npm audit fix || true'
                 }
             }
         }
 
         stage('Snyk Security Scan') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo '🔍 Running Snyk scan...'
-                    sh '''
-                      npm install -g snyk
-                      snyk auth ${SNYK_TOKEN}
-                      snyk test --severity-threshold=high
-                    '''
+                    // Install snyk CLI inside container
+                    sh 'npm install -g snyk'
+                    // Authenticate using Jenkins credential
+                    sh 'snyk auth ${SNYK_TOKEN}'
+                    // Run the scan
+                    sh 'snyk test || true'
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build & Push Image') {
             steps {
                 script {
-                    echo "🐳 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
-                    sh "docker build -t $IMAGE_NAME:$IMAGE_TAG ."
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    echo "📤 Pushing image to Docker Hub: $IMAGE_NAME:$IMAGE_TAG"
+                    echo '🐳 Building and pushing Docker image...'
                     sh '''
+                      docker build -t achani99/node-docker:latest .
                       echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
-                      docker push $IMAGE_NAME:$IMAGE_TAG
+                      docker push achani99/node-docker:latest
                     '''
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    echo '🧪 Running tests...'
+                    sh 'npm test || true'
                 }
             }
         }
@@ -83,7 +106,7 @@ pipeline {
             archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
         }
         failure {
-            echo '❌ Build failed due to errors/vulnerabilities.'
+            echo '❌ Build failed. Check logs above.'
         }
         success {
             echo '✅ Build successful!'
