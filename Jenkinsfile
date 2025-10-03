@@ -1,12 +1,13 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         SNYK_TOKEN = credentials('snyk-token')
-        IMAGE_NAME = "achani99/nodejs-cicd-app"
+        IMAGE_NAME = "achan99/node-docker"
+        IMAGE_TAG  = "16-alpine"
     }
-    
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -20,11 +21,11 @@ pipeline {
                 sh 'ls -la'
             }
         }
-        
+
         stage('Install Dependencies') {
             agent {
                 docker {
-                    image 'achani99/node-docker:16-alpine'
+                    image "${IMAGE_NAME}:${IMAGE_TAG}"
                     args '-u root'
                     reuseNode true
                 }
@@ -44,16 +45,18 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Fix Vulnerabilities') {
             steps {
                 script {
-                    echo '🔒 Checking for vulnerabilities...'
-                    sh 'npm audit --audit-level=high || true'
+                    echo '🔒 Running npm audit...'
+                    sh '''
+                      npm audit --audit-level=high || true
+                    '''
                 }
             }
         }
-        
+
         stage('Snyk Security Scan') {
             steps {
                 script {
@@ -66,7 +69,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build & Push Image') {
             steps {
                 script {
@@ -75,17 +78,17 @@ pipeline {
                       docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
                       echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
                       docker push ${IMAGE_NAME}:${BUILD_NUMBER}
-                      docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest
-                      docker push ${IMAGE_NAME}:latest
+                      docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:${IMAGE_TAG}
+                      docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
                 }
             }
         }
-        
+
         stage('Run Tests') {
             agent {
                 docker {
-                    image 'achani99/node-docker:16-alpine'
+                    image "${IMAGE_NAME}:${IMAGE_TAG}"
                     args '-u root'
                     reuseNode true
                 }
@@ -93,7 +96,6 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    // If you don’t have a test script, just skip gracefully
                     sh '''
                       if npm run | grep -q "test"; then
                         npm test
@@ -105,7 +107,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
             echo '📦 Archiving npm logs (if any)...'
