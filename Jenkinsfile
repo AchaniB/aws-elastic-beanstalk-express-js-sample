@@ -6,13 +6,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout SCM') {
-            steps {
-                echo '🔁 Checking out source code from Git...'
-                checkout scm
-            }
-        }
-
         stage('Checkout Code') {
             steps {
                 echo '📁 Verifying code in workspace...'
@@ -40,21 +33,21 @@ pipeline {
         stage('Fix Vulnerabilities') {
             steps {
                 echo '🔒 Checking for vulnerabilities...'
-                // Add your security scanning steps here
+                // Add vulnerability fix steps here
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
                 echo '🔍 Running Snyk security scan...'
-                // Add Snyk scanning steps here
+                // Add snyk scan command here
             }
         }
 
         stage('Build & Push Image') {
             steps {
                 echo '🐳 Building and pushing Docker image...'
-                // Add Docker build and push logic here
+                // Add docker build & push logic here
             }
         }
 
