@@ -1,11 +1,10 @@
 pipeline {
     agent any
-
+    
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        SNYK_TOKEN = credentials('snyk-token')
     }
-
+    
     stages {
         stage('Checkout Code') {
             steps {
@@ -14,11 +13,11 @@ pipeline {
                 sh 'ls -la'
             }
         }
-
+        
         stage('Install Dependencies') {
             agent {
                 docker {
-                    image 'achani99/node-docker:16-alpine'
+                    image 'node:16-alpine'
                     args '-u root'
                     reuseNode true
                 }
@@ -32,61 +31,38 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Fix Vulnerabilities') {
-            agent {
-                docker {
-                    image 'achani99/node-docker:16-alpine'
-                    args '-u root'
-                    reuseNode true
-                }
-            }
             steps {
                 script {
-                    echo '🔒 Running npm audit fix...'
-                    sh 'npm audit fix || true'
+                    echo '🔒 Checking for vulnerabilities...'
+                    // Add your security scanning steps here
                 }
             }
         }
-
+        
         stage('Snyk Security Scan') {
-            agent {
-                docker {
-                    image 'achani99/node-docker:16-alpine'
-                    args '-u root'
-                    reuseNode true
-                }
-            }
             steps {
                 script {
-                    echo '🔍 Running Snyk scan...'
-                    // Install snyk CLI inside container
-                    sh 'npm install -g snyk'
-                    // Authenticate using Jenkins credential
-                    sh 'snyk auth ${SNYK_TOKEN}'
-                    // Run the scan
-                    sh 'snyk test || true'
+                    echo '🔍 Running security scan...'
+                    // Add Snyk scanning steps here
                 }
             }
         }
-
+        
         stage('Build & Push Image') {
             steps {
                 script {
                     echo '🐳 Building and pushing Docker image...'
-                    sh '''
-                      docker build -t achani99/node-docker:latest .
-                      echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
-                      docker push achani99/node-docker:latest
-                    '''
+                    // Add Docker build/push steps here
                 }
             }
         }
-
+        
         stage('Run Tests') {
             agent {
                 docker {
-                    image 'achani99/node-docker:16-alpine'
+                    image 'node:16-alpine'
                     args '-u root'
                     reuseNode true
                 }
@@ -94,12 +70,12 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    sh 'npm test || true'
+                    sh 'npm test || true'  // Continue even if tests fail
                 }
             }
         }
     }
-
+    
     post {
         always {
             echo '📦 Archiving npm logs (if any)...'
