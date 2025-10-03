@@ -16,7 +16,7 @@ pipeline {
       steps {
         checkout scm
         sh 'echo "✅ Code is now available in workspace: $PWD"'
-        sh 'ls -la'
+        sh 'ls -la' // Optionally list files to show contents
       }
     }
 
