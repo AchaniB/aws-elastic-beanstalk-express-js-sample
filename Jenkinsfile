@@ -18,6 +18,15 @@ pipeline {
       }
     }
 
+    stage('Checkout Code') {
+      steps {
+        script {
+          sh 'echo "✅ Code is now available in workspace: $PWD"'
+          sh 'ls -la' // Optionally list files to show contents
+        }
+      }
+    }
+
     stage('Install Dependencies') {
       steps {
         script {
