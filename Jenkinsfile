@@ -8,27 +8,29 @@ pipeline {
 
   environment {
     IMAGE_NAME = "achani99/node-docker"
-    GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-    IMAGE_TAG = "${GIT_COMMIT_SHORT}"
+    IMAGE_TAG  = "16-alpine"
   }
 
   stages {
-
     stage('Checkout Code') {
       steps {
         checkout scm
-        sh '''
-          echo "Code checked out at: $PWD"
-          echo "Commit: $(git rev-parse --short HEAD)"
-          ls -la
-        '''
+      }
+    }
+
+    stage('Checkout Code') {
+      steps {
+        script {
+          sh 'echo "✅ Code is now available in workspace: $PWD"'
+          sh 'ls -la' // Optionally list files to show contents
+        }
       }
     }
 
     stage('Install Dependencies') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
             sh 'node -v && npm -v'
             sh 'npm ci'
           }
@@ -39,8 +41,8 @@ pipeline {
     stage('Fix Vulnerabilities') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
-            sh 'npm audit fix || echo "Nothing to fix"'
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
+            sh 'npm audit fix || echo "⚠️ Nothing to fix"'
           }
         }
       }
@@ -49,15 +51,15 @@ pipeline {
     stage('Snyk Security Scan') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
             sh 'npm ci --prefer-offline --no-audit'
-            sh 'npm audit --audit-level=high || echo "Vulnerabilities found"'
+            sh 'npm audit --audit-level=high || echo "⚠️ Vulnerabilities found"'
           }
         }
       }
     }
 
-    stage('Build & Push Docker Image') {
+    stage('Build & Push Image') {
       steps {
         script {
           sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
@@ -74,8 +76,8 @@ pipeline {
     stage('Run Tests') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
-            sh 'npm test || echo "No tests or some tests failed"'
+          docker.image("${IMAGE_NAME}:${IMAGE_TAG}").inside('-u root') {
+            sh 'npm test || echo "⚠️ No tests or some tests failed"'
           }
         }
       }
@@ -84,13 +86,13 @@ pipeline {
 
   post {
     success {
-      echo "Build and deployment successful for image: $IMAGE_NAME:$IMAGE_TAG"
+      echo "✅ Build and deployment successful!"
     }
     failure {
-      echo "Build failed. Check logs above."
+      echo "❌ Build failed. Check logs above."
     }
     always {
-      echo 'Archiving npm logs (if any)...'
+      echo '📦 Archiving npm logs (if any)...'
       archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
     }
   }
