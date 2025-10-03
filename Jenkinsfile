@@ -2,25 +2,19 @@ pipeline {
     agent any
 
     options {
-        skipDefaultCheckout(true)
-        timestamps()
-        buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '10'))
+        skipDefaultCheckout(true)   // prevent multiple SCM checkouts
     }
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_NAME = "achani99/nodejs-cicd-app:latest"
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Verify Code') {
-            steps {
-                echo '✅ Code is available in workspace'
+                sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
                 sh 'ls -la'
             }
         }
@@ -35,17 +29,16 @@ pipeline {
             }
             steps {
                 script {
-                    echo '🔧 Verifying Node & NPM...'
-                    sh 'node -v || echo "❌ Node not found"'
-                    sh 'npm -v || echo "❌ NPM not found"'
-
-                    echo '📦 Installing production dependencies...'
+                    echo '🔧 Installing dependencies...'
                     sh '''
-                        if [ -f package.json ]; then
-                            npm ci --only=production || npm install --only=production
-                        else
-                            echo "❌ package.json not found"; exit 1
-                        fi
+                      apk add --no-cache make g++ python3
+                      node -v
+                      npm -v
+                      if [ -f package-lock.json ]; then
+                        npm ci --only=production
+                      else
+                        npm install --only=production
+                      fi
                     '''
                 }
             }
@@ -53,22 +46,39 @@ pipeline {
 
         stage('Fix Vulnerabilities') {
             steps {
-                echo '🔒 Checking for vulnerabilities...'
-                // Add fix logic if needed
+                script {
+                    echo '🔒 Checking for vulnerabilities...'
+                    // Example: auto-fix (optional)
+                    sh 'npm audit fix || true'
+                }
             }
         }
 
         stage('Snyk Security Scan') {
             steps {
-                echo '🔍 Running Snyk security scan...'
-                // Add snyk scan logic here
+                script {
+                    echo '🔍 Running security scan...'
+                    // Ensure snyk is installed first
+                    sh '''
+                      if ! command -v snyk >/dev/null 2>&1; then
+                        npm install -g snyk
+                      fi
+                      snyk test || true
+                    '''
+                }
             }
         }
 
         stage('Build & Push Image') {
             steps {
-                echo '🐳 Building and pushing Docker image...'
-                // Add docker build and push logic here
+                script {
+                    echo '🐳 Building and pushing Docker image...'
+                    sh '''
+                      echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                      docker build -t $IMAGE_NAME .
+                      docker push $IMAGE_NAME
+                    '''
+                }
             }
         }
 
@@ -84,11 +94,11 @@ pipeline {
                 script {
                     echo '🧪 Running tests...'
                     sh '''
-                        if [ -f package.json ]; then
-                            npm test || echo "⚠️ Some tests may have failed."
-                        else
-                            echo "❌ package.json not found. Skipping tests."
-                        fi
+                      if npm test; then
+                        echo "✅ Tests passed"
+                      else
+                        echo "⚠️ Tests failed but pipeline continues"
+                      fi
                     '''
                 }
             }
