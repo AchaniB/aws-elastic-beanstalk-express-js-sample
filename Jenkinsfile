@@ -15,15 +15,8 @@ pipeline {
     stage('Checkout Code') {
       steps {
         checkout scm
-      }
-    }
-
-    stage('Checkout Code') {
-      steps {
-        script {
-          sh 'echo "✅ Code is now available in workspace: $PWD"'
-          sh 'ls -la' // Optionally list files to show contents
-        }
+        sh 'echo "✅ Code is now available in workspace: $PWD"'
+        sh 'ls -la'
       }
     }
 
@@ -97,5 +90,3 @@ pipeline {
     }
   }
 }
-O
-
