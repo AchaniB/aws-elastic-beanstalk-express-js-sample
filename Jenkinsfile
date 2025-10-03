@@ -23,17 +23,23 @@ pipeline {
         '''
       }
     }
-
-    stage('Install Dependencies') {
-      steps {
-        script {
-          docker.image('node:16-alpine').inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
-            sh 'node -v && npm -v'
-            sh 'npm ci'
-          }
-        }
+stage('Install Dependencies') {
+  steps {
+    script {
+      sh 'docker pull node:16-alpine' // make sure latest is pulled
+      docker.image('node:16-alpine').inside('-u root') {
+        sh '''
+          echo "Inside container:"
+          cat /etc/os-release
+          which node
+          node -v
+          npm -v
+        '''
+        sh 'npm ci'
       }
     }
+  }
+}
 
     stage('Fix Vulnerabilities') {
       steps {
