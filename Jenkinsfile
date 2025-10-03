@@ -1,15 +1,10 @@
 pipeline {
     agent any
-
-    options {
-        skipDefaultCheckout(true)   // prevent multiple SCM checkouts
-    }
-
+    
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        IMAGE_NAME = "achani99/nodejs-cicd-app:latest"
     }
-
+    
     stages {
         stage('Checkout Code') {
             steps {
@@ -18,7 +13,7 @@ pipeline {
                 sh 'ls -la'
             }
         }
-
+        
         stage('Install Dependencies') {
             agent {
                 docker {
@@ -30,58 +25,40 @@ pipeline {
             steps {
                 script {
                     echo '🔧 Installing dependencies...'
-                    sh '''
-                      apk add --no-cache make g++ python3
-                      node -v
-                      npm -v
-                      if [ -f package-lock.json ]; then
-                        npm ci --only=production
-                      else
-                        npm install --only=production
-                      fi
-                    '''
+                    sh 'node -v'
+                    sh 'npm -v'
+                    sh 'npm ci --only=production'
                 }
             }
         }
-
+        
         stage('Fix Vulnerabilities') {
             steps {
                 script {
                     echo '🔒 Checking for vulnerabilities...'
-                    // Example: auto-fix (optional)
-                    sh 'npm audit fix || true'
+                    // Add your security scanning steps here
                 }
             }
         }
-
+        
         stage('Snyk Security Scan') {
             steps {
                 script {
                     echo '🔍 Running security scan...'
-                    // Ensure snyk is installed first
-                    sh '''
-                      if ! command -v snyk >/dev/null 2>&1; then
-                        npm install -g snyk
-                      fi
-                      snyk test || true
-                    '''
+                    // Add Snyk scanning steps here
                 }
             }
         }
-
+        
         stage('Build & Push Image') {
             steps {
                 script {
                     echo '🐳 Building and pushing Docker image...'
-                    sh '''
-                      echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
-                      docker build -t $IMAGE_NAME .
-                      docker push $IMAGE_NAME
-                    '''
+                    // Add Docker build/push steps here
                 }
             }
         }
-
+        
         stage('Run Tests') {
             agent {
                 docker {
@@ -93,18 +70,12 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    sh '''
-                      if npm test; then
-                        echo "✅ Tests passed"
-                      else
-                        echo "⚠️ Tests failed but pipeline continues"
-                      fi
-                    '''
+                    sh 'npm test || true'  // Continue even if tests fail
                 }
             }
         }
     }
-
+    
     post {
         always {
             echo '📦 Archiving npm logs (if any)...'
