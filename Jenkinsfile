@@ -9,7 +9,6 @@ pipeline {
   environment {
     IMAGE_NAME = "achani99/node-docker"
     IMAGE_TAG  = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-  
   }
 
   stages {
@@ -28,7 +27,7 @@ pipeline {
     stage('Install Dependencies') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
+          docker.image('node:16-alpine').inside('-u root -v /var/run/docker.sock:/var/run/docker.sock') {
             sh 'node -v && npm -v'
             sh 'npm ci'
           }
@@ -39,7 +38,7 @@ pipeline {
     stage('Fix Vulnerabilities') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
+          docker.image('node:16-alpine').inside('-u root') {
             sh 'npm audit fix || echo "Nothing to fix"'
           }
         }
@@ -49,7 +48,7 @@ pipeline {
     stage('Snyk Security Scan') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
+          docker.image('node:16-alpine').inside('-u root') {
             sh 'npm ci --prefer-offline --no-audit'
             sh 'npm audit --audit-level=high || echo "Vulnerabilities found"'
           }
@@ -74,7 +73,7 @@ pipeline {
     stage('Run Tests') {
       steps {
         script {
-          docker.image("${IMAGE_NAME}:16-alpine").inside('-u root') {
+          docker.image('node:16-alpine').inside('-u root') {
             sh 'npm test || echo "No tests or some tests failed"'
           }
         }
