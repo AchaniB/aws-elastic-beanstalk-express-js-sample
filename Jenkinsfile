@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     options {
-        skipDefaultCheckout(true)   // avoid double checkout
+        skipDefaultCheckout(true)   // avoid duplicate checkouts
     }
 
     environment {
@@ -23,7 +23,7 @@ pipeline {
         stage('Install Dependencies') {
             agent {
                 docker {
-                    image 'node:16-alpine'
+                    image 'achani99/node-docker:16-alpine'
                     args '-u root'
                     reuseNode true
                 }
@@ -46,6 +46,13 @@ pipeline {
         }
 
         stage('Fix Vulnerabilities') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo '🔒 Checking for vulnerabilities...'
@@ -55,6 +62,13 @@ pipeline {
         }
 
         stage('Snyk Security Scan') {
+            agent {
+                docker {
+                    image 'achani99/node-docker:16-alpine'
+                    args '-u root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo '🔍 Running Snyk security scan...'
@@ -84,7 +98,7 @@ pipeline {
         stage('Run Tests') {
             agent {
                 docker {
-                    image 'node:16-alpine'
+                    image 'achani99/node-docker:16-alpine'
                     args '-u root'
                     reuseNode true
                 }
@@ -92,13 +106,7 @@ pipeline {
             steps {
                 script {
                     echo '🧪 Running tests...'
-                    sh '''
-                      if npm test; then
-                        echo "✅ Tests passed"
-                      else
-                        echo "⚠️ Tests failed but pipeline continues"
-                      fi
-                    '''
+                    sh 'npm test || true'
                 }
             }
         }
