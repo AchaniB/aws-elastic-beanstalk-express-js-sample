@@ -12,18 +12,12 @@ pipeline {
   }
 
   stages {
-    stage('Checkout Code') {
-      steps {
-        checkout scm
-      }
-    }
 
     stage('Checkout Code') {
       steps {
-        script {
-          sh 'echo "✅ Code is now available in workspace: $PWD"'
-          sh 'ls -la' // Optionally list files to show contents
-        }
+        checkout scm
+        sh 'echo "✅ Code is now available in workspace: $PWD"'
+        sh 'ls -la'
       }
     }
 
