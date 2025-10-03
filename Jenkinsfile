@@ -8,7 +8,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = "achani99/node-docker"
-    IMAGE_TAG  = "18"
+    IMAGE_TAG  = "16-alpine"
   }
 
   stages {
