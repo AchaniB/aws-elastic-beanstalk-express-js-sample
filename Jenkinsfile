@@ -11,15 +11,10 @@ pipeline {
     IMAGE_TAG  = "16-alpine"
   }
 
-  stages {
-    stage('Checkout Code') {
-      steps {
-        checkout scm
-      }
-    }
 
     stage('Checkout Code') {
       steps {
+        checkout scm
         script {
           sh 'echo "✅ Code is now available in workspace: $PWD"'
           sh 'ls -la' // Optionally list files to show contents
