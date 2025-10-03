@@ -1,19 +1,26 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
     }
-    
+
     stages {
+        stage('Checkout SCM') {
+            steps {
+                echo '🔁 Checking out source code from Git...'
+                checkout scm
+            }
+        }
+
         stage('Checkout Code') {
             steps {
-                checkout scm
+                echo '📁 Verifying code in workspace...'
                 sh 'echo "✅ Code is now available in workspace: ${WORKSPACE}"'
                 sh 'ls -la'
             }
         }
-        
+
         stage('Install Dependencies') {
             agent {
                 docker {
@@ -23,42 +30,34 @@ pipeline {
                 }
             }
             steps {
-                script {
-                    echo '🔧 Installing dependencies...'
-                    sh 'node -v'
-                    sh 'npm -v'
-                    sh 'npm ci --only=production'
-                }
+                echo '🔧 Installing dependencies...'
+                sh 'node -v'
+                sh 'npm -v'
+                sh 'npm ci --only=production'
             }
         }
-        
+
         stage('Fix Vulnerabilities') {
             steps {
-                script {
-                    echo '🔒 Checking for vulnerabilities...'
-                    // Add your security scanning steps here
-                }
+                echo '🔒 Checking for vulnerabilities...'
+                // Add your security scanning steps here
             }
         }
-        
+
         stage('Snyk Security Scan') {
             steps {
-                script {
-                    echo '🔍 Running security scan...'
-                    // Add Snyk scanning steps here
-                }
+                echo '🔍 Running Snyk security scan...'
+                // Add Snyk scanning steps here
             }
         }
-        
+
         stage('Build & Push Image') {
             steps {
-                script {
-                    echo '🐳 Building and pushing Docker image...'
-                    // Add Docker build/push steps here
-                }
+                echo '🐳 Building and pushing Docker image...'
+                // Add Docker build and push logic here
             }
         }
-        
+
         stage('Run Tests') {
             agent {
                 docker {
@@ -68,14 +67,12 @@ pipeline {
                 }
             }
             steps {
-                script {
-                    echo '🧪 Running tests...'
-                    sh 'npm test || true'  // Continue even if tests fail
-                }
+                echo '🧪 Running tests...'
+                sh 'npm test || echo "⚠️ Some tests may have failed."'
             }
         }
     }
-    
+
     post {
         always {
             echo '📦 Archiving npm logs (if any)...'
