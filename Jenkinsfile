@@ -13,29 +13,41 @@ pipeline {
 
   stages {
 
+    stage('Checkout SCM') {
+      steps {
+        echo 'Checking out code from SCM'
+        checkout scm
+      }
+    }
+
     stage('Checkout Code') {
       steps {
-        echo 'Checking out code...'
-        checkout scm
+        echo 'Displaying current working directory'
+        sh 'echo "PWD: $PWD"'
 
-        echo 'Showing current directory and latest commit:'
-        sh 'echo "Code checked out at: $PWD"'
-        sh 'echo "Commit: $(git rev-parse --short HEAD)"'
+        echo 'Getting short commit hash'
+        sh 'git rev-parse --short HEAD'
+
+        echo 'Listing directory contents'
         sh 'ls -la'
       }
     }
 
     stage('Install Dependencies') {
       steps {
-        echo 'Using node:16-alpine to install dependencies...'
+        echo 'Pulling node:16-alpine image'
         sh 'docker pull node:16-alpine'
+
+        echo 'Running inside node:16-alpine container'
         script {
           docker.image('node:16-alpine').inside('-u root') {
-            echo 'Checking Node and NPM versions:'
+            echo 'Verifying Node.js version'
             sh 'node -v'
+
+            echo 'Verifying npm version'
             sh 'npm -v'
 
-            echo 'Installing dependencies with npm ci...'
+            echo 'Installing dependencies using npm ci'
             sh 'npm ci'
           }
         }
@@ -44,9 +56,10 @@ pipeline {
 
     stage('Fix Vulnerabilities') {
       steps {
-        echo 'Attempting to fix known vulnerabilities...'
+        echo 'Fixing known vulnerabilities'
         script {
           docker.image('node:16-alpine').inside('-u root') {
+            echo 'Running npm audit fix'
             sh 'npm audit fix || echo "Nothing to fix"'
           }
         }
@@ -55,10 +68,13 @@ pipeline {
 
     stage('Snyk Security Scan') {
       steps {
-        echo 'Running npm audit --audit-level=high...'
+        echo 'Preparing for audit scan'
         script {
           docker.image('node:16-alpine').inside('-u root') {
+            echo 'Reinstalling dependencies without audit'
             sh 'npm ci --prefer-offline --no-audit'
+
+            echo 'Running npm audit with high severity level'
             sh 'npm audit --audit-level=high || echo "Vulnerabilities found"'
           }
         }
@@ -67,10 +83,10 @@ pipeline {
 
     stage('Build & Push Docker Image') {
       steps {
-        echo 'Building Docker image...'
+        echo 'Building Docker image'
         sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
 
-        echo 'Logging into DockerHub and pushing image...'
+        echo 'Logging into DockerHub and pushing image'
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
           sh '''
             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
@@ -82,9 +98,10 @@ pipeline {
 
     stage('Run Tests') {
       steps {
-        echo 'Running tests...'
+        echo 'Running tests'
         script {
           docker.image('node:16-alpine').inside('-u root') {
+            echo 'Executing npm test'
             sh 'npm test || echo "No tests or some tests failed"'
           }
         }
@@ -94,13 +111,13 @@ pipeline {
 
   post {
     success {
-      echo "✅ Build and deployment successful for image: $IMAGE_NAME:$IMAGE_TAG"
+      echo "Build and deployment successful for image: $IMAGE_NAME:$IMAGE_TAG"
     }
     failure {
-      echo "❌ Build failed. Check logs above."
+      echo "Build failed. Check logs above."
     }
     always {
-      echo 'Archiving npm logs (if any)...'
+      echo 'Archiving npm logs if any'
       archiveArtifacts artifacts: '**/npm-debug.log', allowEmptyArchive: true
     }
   }
